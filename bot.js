@@ -3,10 +3,11 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
-let approvals = {};
+
+let approvals = {}; // internal store
 
 export function setApprovalsStore(store) {
-  Object.assign(approvals, store);
+  approvals = store;
 }
 
 export function startBot() {
@@ -36,10 +37,9 @@ export function startBot() {
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
 }
 
-// Function to send new approval message
 export async function sendApprovalRequest(email, identifier) {
   const chatId = process.env.CHAT_ID;
-  const url = `${process.env.APP_URL}/`; // Your Render server URL
+
   approvals[identifier] = { email, status: "pending" };
 
   const keyboard = {
@@ -57,4 +57,3 @@ export async function sendApprovalRequest(email, identifier) {
     { reply_markup: keyboard }
   );
 }
-
