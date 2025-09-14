@@ -6,7 +6,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 let approvals = {};
 
 export function setApprovalsStore(store) {
-  approvals = store;
+  Object.assign(approvals, store);
 }
 
 export function startBot() {
@@ -57,3 +57,4 @@ export async function sendApprovalRequest(email, identifier) {
     { reply_markup: keyboard }
   );
 }
+
