@@ -1,36 +1,35 @@
 // server.js
-const express = require("express");
-const bodyParser = require("body-parser");
-const cors = require("cors");
+import express from "express";
+import bodyParser from "body-parser";
+import cors from "cors";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
 app.use(cors());
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// In-memory store { email: status }
-const loginDecisions = {};
+// Store pending approvals
+export const pendingApprovals = {}; // { email: { status: 'pending'|'accepted'|'rejected' } }
 
-// Called by bot.js when decision is made
-app.post("/update-status", (req, res) => {
-  const { email, status } = req.body;
-  if (!email || !status) {
-    return res.status(400).json({ error: "Missing email or status" });
-  }
-  loginDecisions[email] = status;
-  res.json({ success: true });
+// Endpoint for frontend to send login requests
+app.post("/send-login", (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).send({ error: "Missing email" });
+
+  // Mark email as pending
+  pendingApprovals[email] = { status: "pending" };
+
+  res.json({ status: "ok" });
 });
 
-// Frontend polls here
+// Endpoint for frontend to poll approval status
 app.post("/check-status", (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ error: "Missing email" });
-
-  const status = loginDecisions[email] || "pending";
-  res.json({ status });
+  if (!email || !pendingApprovals[email]) return res.json({ status: "pending" });
+  res.json({ status: pendingApprovals[email].status });
 });
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
