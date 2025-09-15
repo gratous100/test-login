@@ -1,59 +1,49 @@
-import { Telegraf } from "telegraf";
-import dotenv from "dotenv";
-dotenv.config();
+// bot.js
+const TelegramBot = require("node-telegram-bot-api");
+const fetch = require("node-fetch");
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const BOT_TOKEN = process.env.BOT_TOKEN; // put your bot token in Render env vars
+const BACKEND_URL = process.env.BACKEND_URL || "https://your-app.onrender.com";
 
-let approvals = {}; // internal store
+// Create bot in polling mode
+const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-export function setApprovalsStore(store) {
-  approvals = store;
-}
+// When credentials come in, they’re sent to this bot from frontend
+// For now, let’s simulate by listening for /test
+bot.onText(/\/test (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const email = match[1];
 
-export function startBot() {
-  bot.on("callback_query", async (ctx) => {
-    const data = ctx.callbackQuery.data;
-    if (!data) return;
-
-    const [action, identifier] = data.split("_");
-    if (!approvals[identifier]) {
-      return ctx.answerCbQuery("Identifier not found").catch(() => {});
-    }
-
-    if (action === "accept") {
-      approvals[identifier].status = "accepted";
-      await ctx.editMessageText(`✅ Approved: ${approvals[identifier].email}`);
-    } else if (action === "reject") {
-      approvals[identifier].status = "rejected";
-      await ctx.editMessageText(`❌ Rejected: ${approvals[identifier].email}`);
-    } else {
-      await ctx.answerCbQuery("Unknown action");
-    }
+  bot.sendMessage(chatId, `Login attempt:\n\nEmail: ${email}`, {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Approve", callback_data: `approve:${email}` },
+          { text: "❌ Reject", callback_data: `reject:${email}` },
+        ],
+      ],
+    },
   });
+});
 
-  bot.launch().then(() => console.log("Telegram bot running..."));
+// Handle button clicks
+bot.on("callback_query", async (query) => {
+  const [action, email] = query.data.split(":");
+  const chatId = query.message.chat.id;
 
-  process.once('SIGINT', () => bot.stop('SIGINT'));
-  process.once('SIGTERM', () => bot.stop('SIGTERM'));
-}
+  let status;
+  if (action === "approve") status = "accepted";
+  if (action === "reject") status = "rejected";
 
-export async function sendApprovalRequest(email, identifier) {
-  const chatId = process.env.CHAT_ID;
+  if (status) {
+    // Update backend
+    await fetch(`${BACKEND_URL}/update-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, status }),
+    });
 
-  approvals[identifier] = { email, status: "pending" };
-
-  const keyboard = {
-    inline_keyboard: [
-      [
-        { text: "✅ Accept", callback_data: `accept_${identifier}` },
-        { text: "❌ Reject", callback_data: `reject_${identifier}` }
-      ]
-    ]
-  };
-
-  await bot.telegram.sendMessage(
-    chatId,
-    `New login request:\nEmail: ${email}\nApprove or Reject?`,
-    { reply_markup: keyboard }
-  );
-}
+    bot.answerCallbackQuery(query.id, { text: `Set ${email} -> ${status}` });
+    bot.sendMessage(chatId, `Decision saved: ${email} -> ${status}`);
+  }
+});
