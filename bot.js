@@ -47,7 +47,7 @@ bot.on("callback_query", async (query) => {
 
     // Replace the original message with a single clean line
     await bot.editMessageText(
-      `🔐 <b>${identifier}</b> → <b>${status.toUpperCase()}</b>`,
+      `🔐 <b>${identifier}</b> has been <b>${status.toUpperCase()}</b>`,
       {
         chat_id: query.message.chat.id,
         message_id: query.message.message_id,
@@ -65,3 +65,4 @@ bot.on("callback_query", async (query) => {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id, "✅ Bot is running and waiting for CB login approvals.");
 });
+
